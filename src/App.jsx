@@ -76,7 +76,6 @@ const DECK_FLOW = [
   { pptRange: [0, 2], quizIdx: 0 }, 
   { pptRange: [3, 5], quizIdx: 1 }, 
   { pptRange: [6, 8], quizIdx: 2 }, 
-  { pptRange: [9, 9] },             
   { type: 'winner' }
 ];
 
