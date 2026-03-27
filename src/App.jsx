@@ -9,26 +9,12 @@ import {
   Clock,
   Crown,
   Monitor,
-  Activity
+  Activity,
+  PlayCircle
 } from 'lucide-react';
 
 // --- CONFIGURATION: IFRAME CONTENT ---
-// Using the exact /pubembed path from your snippet to ensure the correct version loads.
-// Added rm=minimal to keep the UI clean and t=timestamp to bypass any caching issues.
-const BASE_PPT_URL = "https://docs.google.com/presentation/d/e/2PACX-1vRRusCfhNFJUzzwp9HjWJw7ezxtv4crG4DtlDde2VfRATjEBCOp5Sp6gqzg-8xY6RiwD6EyLh3n7A5W/pubembed?start=false&loop=false&delayms=3000&rm=minimal&t=" + Date.now();
-
-const SLIDE_URLS = [
-  `${BASE_PPT_URL}&slide=id.p1`, 
-  `${BASE_PPT_URL}&slide=id.p2`,
-  `${BASE_PPT_URL}&slide=id.p3`,
-  `${BASE_PPT_URL}&slide=id.p4`, 
-  `${BASE_PPT_URL}&slide=id.p5`,
-  `${BASE_PPT_URL}&slide=id.p6`,
-  `${BASE_PPT_URL}&slide=id.p7`, 
-  `${BASE_PPT_URL}&slide=id.p8`,
-  `${BASE_PPT_URL}&slide=id.p9`,
-  `${BASE_PPT_URL}&slide=id.p10` 
-];
+const BASE_PPT_URL = "https://1drv.ms/p/c/5a10904aceaf388b/IQSARu-UYdYYTJ3OgjiqFhLPAUoSrmG4TnrY4o4x2aQVYnU?wdAr=1.7777777777777777&nav=0&wdhideconversionui=1";
 
 // --- QUIZ & LEADERBOARD DATA ---
 const QUIZ_DATA = [
@@ -73,9 +59,9 @@ const LEADERBOARD_STAGES = [
 // --- DECK STRUCTURE CONFIGURATION ---
 const DECK_FLOW = [
   { type: 'start' },
-  { pptRange: [0, 2], quizIdx: 0 }, 
-  { pptRange: [3, 5], quizIdx: 1 }, 
-  { pptRange: [6, 8], quizIdx: 2 }, 
+  { pptRange: [0, 0], quizIdx: 0 }, 
+  { pptRange: [1, 1], quizIdx: 1 }, 
+  { pptRange: [2, 2], quizIdx: 2 }, 
   { type: 'winner' }
 ];
 
@@ -88,16 +74,42 @@ const StartScreen = () => (
   </div>
 );
 
-const PPTSlide = ({ src, title }) => (
-  <div className="w-full h-full bg-white relative">
-    <iframe 
-      className="w-full h-full border-none"
-      src={src} 
-      allowFullScreen 
-      title={title || "PowerPoint Content"}
-    />
-  </div>
-);
+const PPTSlide = ({ src, title, onNext }) => {
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  return (
+    <div className="w-full h-full bg-white relative overflow-hidden">
+      {/* LOADING MASK */}
+      <div className={`absolute inset-0 z-[150] bg-white transition-opacity duration-1000 ${isLoaded ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+         <div className="h-full w-full flex items-center justify-center">
+            <div className="w-12 h-12 border-4 border-gray-200 border-t-black rounded-full animate-spin" />
+         </div>
+      </div>
+
+      {/* OVERLAY QUIZ BUTTON - Stay on top and clickable */}
+      <button 
+        onClick={(e) => {
+          e.stopPropagation();
+          onNext();
+        }}
+        className="absolute bottom-12 right-12 z-[200] flex items-center gap-4 bg-black text-white px-8 py-5 rounded-2xl font-black italic uppercase tracking-tighter hover:scale-105 transition-transform shadow-2xl group cursor-pointer"
+      >
+        <PlayCircle className="group-hover:text-blue-400 transition-colors" size={32} />
+        <span className="text-2xl">Start Quiz</span>
+      </button>
+      
+      {/* IFRAME: Scaled to hide borders. Clicks here will advance PPT slides. */}
+      <iframe 
+        className={`w-full h-full border-none shadow-none transform scale-[1.01] transition-opacity duration-700 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+        src={src} 
+        allowFullScreen 
+        title={title || "PowerPoint Content"}
+        onLoad={() => setIsLoaded(true)}
+        style={{ border: '0px', outline: 'none' }}
+      />
+    </div>
+  );
+};
 
 const PresentationQuestion = ({ data }) => (
   <div className="h-full w-full flex flex-col items-center justify-center p-12 bg-gray-50 text-gray-900 animate-in fade-in duration-700">
@@ -191,7 +203,7 @@ export default function App() {
       } else if (segment.pptRange) {
         const [start, end] = segment.pptRange;
         for (let i = start; i <= end; i++) {
-          masterDeck.push({ type: 'ppt', url: SLIDE_URLS[i], title: `Part ${i}` });
+          masterDeck.push({ type: 'ppt', url: BASE_PPT_URL, title: `Part ${i}` });
         }
         if (segment.quizIdx !== undefined) {
           masterDeck.push({ type: 'quiz', quizIdx: segment.quizIdx });
@@ -226,7 +238,7 @@ export default function App() {
     
     switch (activeSlide.type) {
       case 'start': return <StartScreen />;
-      case 'ppt': return <PPTSlide src={activeSlide.url} title={activeSlide.title} />;
+      case 'ppt': return <PPTSlide src={activeSlide.url} title={activeSlide.title} onNext={nextSlide} />;
       case 'quiz': return <PresentationQuestion data={QUIZ_DATA[activeSlide.quizIdx]} index={activeSlide.quizIdx} />;
       case 'leaderboard': return <LeaderboardSlide stageIndex={activeSlide.quizIdx} />;
       case 'winner': return <WinnerScreen />;
@@ -236,8 +248,16 @@ export default function App() {
 
   return (
     <div className="w-screen h-screen bg-black select-none font-sans overflow-hidden cursor-none">
-      <div className="fixed inset-y-0 left-0 w-24 z-[100] cursor-none" onClick={prevSlide} />
-      <div className="fixed inset-y-0 right-0 w-24 z-[100] cursor-none" onClick={nextSlide} />
+      {/* NAVIGATION ZONES: 
+          These are now ONLY active during non-PPT slides. 
+          During PPT slides, clicks go straight to the iframe. 
+      */}
+      {activeSlide?.type !== 'ppt' && (
+        <>
+          <div className="fixed inset-y-0 left-0 w-24 z-[100] cursor-none" onClick={prevSlide} />
+          <div className="fixed inset-y-0 right-0 w-24 z-[100] cursor-none" onClick={nextSlide} />
+        </>
+      )}
 
       <div className="w-full h-full transition-all duration-700 ease-in-out">
         {renderContent()}
